@@ -50,28 +50,17 @@ func (t *LinkStorage) getLink(shortLink string) (string, bool) {
 	return originalLink, true
 }
 
-func handleRoute(response http.ResponseWriter, request *http.Request) {
-	/*val, ok := request.Header[http.CanonicalHeaderKey("content-type")]
-	if !ok {
-		http.Error(response, "content-type error", http.StatusBadRequest)
-		return
-	}
-
-	if val[0] != "text/plain" {
-		http.Error(response, "content-type value error", http.StatusBadRequest)
-		return
-	}*/
-
+func HandleRoute(response http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodPost {
-		handleCreateShortLink(response, request)
+		HandleCreateShortLink(response, request)
 	} else if request.Method == http.MethodGet {
-		handleConvertToFullLink(response, request)
+		HandleConvertToFullLink(response, request)
 	} else {
 		http.Error(response, "", http.StatusBadRequest)
 	}
 }
 
-func handleCreateShortLink(response http.ResponseWriter, request *http.Request) {
+func HandleCreateShortLink(response http.ResponseWriter, request *http.Request) {
 	var link []byte
 	link, err := io.ReadAll(request.Body)
 	if err != nil || len(link) == 0 {
@@ -92,7 +81,7 @@ func handleCreateShortLink(response http.ResponseWriter, request *http.Request) 
 	response.Write([]byte("http://localhost:8080" + shortLink))
 }
 
-func handleConvertToFullLink(response http.ResponseWriter, request *http.Request) {
+func HandleConvertToFullLink(response http.ResponseWriter, request *http.Request) {
 	if err := request.ParseForm(); err != nil {
 		http.Error(response, "", http.StatusBadRequest)
 		return
@@ -114,7 +103,7 @@ func main() {
 	rand.Seed(uint64(time.Now().UnixNano()))
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, handleRoute)
+	mux.HandleFunc(`/`, HandleRoute)
 	err := http.ListenAndServe(`localhost:8080`, mux)
 	if err != nil {
 		panic(err)
