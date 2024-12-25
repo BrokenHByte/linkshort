@@ -6,106 +6,52 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/BrokenHByte/linkshort/internal/linkstorage"
+	"github.com/go-chi/chi"
 	"golang.org/x/exp/rand"
 )
 
-const LengthShortLink = 10
+var lStorage = linkstorage.NewLinkStorage()
 
-type LinkStorage struct {
-	links map[string]string
-}
-
-func NewLinkStorage() *LinkStorage {
-	var g LinkStorage
-	g.links = make(map[string]string)
-	return &g
-}
-
-var linkStorage = NewLinkStorage()
-
-func generateShortLink() string {
-	bytes := make([]byte, LengthShortLink)
-	for i := 0; i < LengthShortLink; i++ {
-		bytes[i] = byte(65 + rand.Intn(90-65))
-	}
-	return string(bytes)
-}
-
-func (t *LinkStorage) addLink(originalLink string) string {
-	for {
-		shortLink := "/" + generateShortLink()
-		_, ok := t.links[shortLink]
-		if !ok {
-			t.links[shortLink] = originalLink
-			return shortLink
-		}
-	}
-}
-
-func (t *LinkStorage) getLink(shortLink string) (string, bool) {
-	originalLink, ok := t.links[shortLink]
-	for !ok {
-		return "", false
-	}
-	return originalLink, true
-}
-
-func HandleRoute(response http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodPost {
-		HandleCreateShortLink(response, request)
-	} else if request.Method == http.MethodGet {
-		HandleConvertToFullLink(response, request)
-	} else {
-		http.Error(response, "", http.StatusBadRequest)
-	}
-}
-
-func HandleCreateShortLink(response http.ResponseWriter, request *http.Request) {
-	var link []byte
-	link, err := io.ReadAll(request.Body)
+func HandleCreateShortLink(rw http.ResponseWriter, r *http.Request) {
+	link, err := io.ReadAll(r.Body)
 	if err != nil || len(link) == 0 {
-		http.Error(response, "body error", http.StatusBadRequest)
+		http.Error(rw, "body link error", http.StatusBadRequest)
 		return
 	}
 
 	newURL := string(link)
 	_, err = url.Parse(newURL)
 	if err != nil {
-		http.Error(response, "url error", http.StatusBadRequest)
+		http.Error(rw, "url error", http.StatusBadRequest)
 		return
 	}
 
-	shortLink := linkStorage.addLink(newURL)
-	response.Header().Set("Content-Type", "text/plain")
-	response.WriteHeader(201)
-	response.Write([]byte("http://localhost:8080" + shortLink))
+	shortLink := lStorage.AddLink(newURL)
+	rw.Header().Set("Content-Type", "text/plain")
+	rw.WriteHeader(http.StatusCreated)
+	rw.Write([]byte("http://" + r.Host + "/" + shortLink))
 }
 
-func HandleConvertToFullLink(response http.ResponseWriter, request *http.Request) {
-	if err := request.ParseForm(); err != nil {
-		http.Error(response, "", http.StatusBadRequest)
-		return
-	}
-
-	id := request.URL.Path
-	originalLink, ok := linkStorage.getLink(id)
+func HandleGetFullLink(rw http.ResponseWriter, r *http.Request) {
+	// Получаем короткую ссылку, если валидна, возвращаем редирект
+	shortLink := chi.URLParam(r, "shortLink")
+	originalLink, ok := lStorage.GetLink(shortLink)
 	if !ok {
-		http.Error(response, "", http.StatusBadRequest)
+		http.Error(rw, "invalid short link", http.StatusBadRequest)
 		return
 	}
-
-	response.Header().Set("Content-Type", "text/plain")
-	response.Header().Set("Location", originalLink)
-	response.WriteHeader(307)
+	rw.Header().Set("Location", originalLink)
+	rw.WriteHeader(http.StatusTemporaryRedirect)
 }
 
 func main() {
 	rand.Seed(uint64(time.Now().UnixNano()))
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, HandleRoute)
-	err := http.ListenAndServe(`localhost:8080`, mux)
-	if err != nil {
-		panic(err)
-	}
+	r := chi.NewRouter()
+	r.Post("/", HandleCreateShortLink)
+	r.Get("/{shortLink}", HandleGetFullLink)
+
+	// r передаётся как http.Handler
+	http.ListenAndServe(":8080", r)
 }
