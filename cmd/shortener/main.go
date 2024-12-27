@@ -6,12 +6,15 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/BrokenHByte/linkshort/internal/config"
+	"github.com/BrokenHByte/linkshort/internal/flags"
 	"github.com/BrokenHByte/linkshort/internal/linkstorage"
 	"github.com/go-chi/chi"
 	"golang.org/x/exp/rand"
 )
 
 var lStorage = linkstorage.NewLinkStorage()
+var configServer *config.ServerConfig
 
 func HandleCreateShortLink(rw http.ResponseWriter, r *http.Request) {
 	link, err := io.ReadAll(r.Body)
@@ -27,10 +30,10 @@ func HandleCreateShortLink(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortLink := lStorage.AddLink(newURL)
+	shortLink := lStorage.AddLink(newURL, "")
 	rw.Header().Set("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusCreated)
-	rw.Write([]byte("http://" + r.Host + "/" + shortLink))
+	rw.Write([]byte(configServer.PrefixLink + "/" + shortLink))
 }
 
 func HandleGetFullLink(rw http.ResponseWriter, r *http.Request) {
@@ -47,11 +50,15 @@ func HandleGetFullLink(rw http.ResponseWriter, r *http.Request) {
 
 func main() {
 	rand.Seed(uint64(time.Now().UnixNano()))
+	configServer = config.NewServerConfig()
+	flags.ParseFlags(configServer)
 
 	r := chi.NewRouter()
 	r.Post("/", HandleCreateShortLink)
 	r.Get("/{shortLink}", HandleGetFullLink)
 
-	// r передаётся как http.Handler
-	http.ListenAndServe(":8080", r)
+	err := http.ListenAndServe(configServer.ServerAddr, r)
+	if err != nil {
+		panic("The server address is inaccessible or not valid")
+	}
 }
