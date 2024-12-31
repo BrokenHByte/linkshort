@@ -6,52 +6,40 @@ import (
 	"golang.org/x/exp/rand"
 )
 
-const LengthShortLink = 10
-
 type LinkStorage struct {
 	links sync.Map
 }
 
-var charSet [52]uint8 // 26 + 26
+const LengthShortLink = 10
 
-func init() {
-	// UTF-8, but valid
-	index := 0
-	for i := 'A'; i <= 'Z'; i++ {
-		charSet[index] = uint8(i)
-		index++
-	}
-	for i := 'a'; i <= 'z'; i++ {
-		charSet[index] = uint8(i)
-		index++
-	}
-}
-
-func NewLinkStorage() *LinkStorage {
-	var g LinkStorage
-	return &g
-}
+var charSet []rune = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func generateShortLink() string {
-	bytes := make([]byte, LengthShortLink)
+	bytes := make([]rune, LengthShortLink)
 	for i := 0; i < LengthShortLink; i++ {
-		bytes[i] = charSet[byte(rand.Intn(52))]
+		bytes[i] = charSet[rand.Intn(len(charSet))]
 	}
 	return string(bytes)
 }
 
-func (t *LinkStorage) AddLink(originalLink string, prefix string) string {
+func (t *LinkStorage) AddLink(originalLink string) (string, bool) {
+	if originalLink == "" {
+		return "", false
+	}
+
 	for {
-		shortLink := prefix + generateShortLink()
-		_, ok := t.links.Load(shortLink)
-		if !ok {
-			t.links.Store(shortLink, originalLink)
-			return shortLink
+		shortLink := generateShortLink()
+		_, loaded := t.links.LoadOrStore(shortLink, originalLink)
+		if !loaded {
+			return shortLink, true
 		}
 	}
 }
 
 func (t *LinkStorage) GetLink(shortLink string) (string, bool) {
+	if shortLink == "" {
+		return "", false
+	}
 	originalLink, ok := t.links.Load(shortLink)
 	for !ok {
 		return "", false
