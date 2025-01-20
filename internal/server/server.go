@@ -5,6 +5,7 @@ import (
 
 	"github.com/BrokenHByte/linkshort/internal/config"
 	"github.com/BrokenHByte/linkshort/internal/handlers"
+	"github.com/BrokenHByte/linkshort/internal/logs"
 	"github.com/go-chi/chi"
 )
 
@@ -16,8 +17,8 @@ type Server struct {
 func RunServer(handlers *handlers.Handlers, config *config.ServerConfig) *Server {
 	server := Server{handlers, config}
 	r := chi.NewRouter()
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) { handlers.HandleCreateShortLink(w, r) })
-	r.Get("/{shortLink}", handlers.HandleGetFullLink)
+	r.Post("/", logs.LoggingRequest(handlers.HandleCreateShortLink()))
+	r.Get("/{shortLink}", logs.LoggingRequest(handlers.HandleGetFullLink()))
 
 	err := http.ListenAndServe(config.ServerAddr, r)
 	if err != nil {

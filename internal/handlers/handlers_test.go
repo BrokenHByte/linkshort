@@ -85,7 +85,7 @@ func TestHandlersCreateAndGet(t *testing.T) {
 			wSend := httptest.NewRecorder()
 
 			h := NewHandlers(config, storage)
-			h.HandleCreateShortLink(wSend, requestPost)
+			h.HandleCreateShortLink().ServeHTTP(wSend, requestPost)
 			result := wSend.Result()
 
 			shortURL := ""
@@ -113,7 +113,7 @@ func TestHandlersCreateAndGet(t *testing.T) {
 			rctx.URLParams.Add("shortLink", parseURL.Path)
 			requestGet = requestGet.WithContext(context.WithValue(requestGet.Context(), chi.RouteCtxKey, rctx))
 
-			h.HandleGetFullLink(wGet, requestGet)
+			h.HandleGetFullLink().ServeHTTP(wGet, requestGet)
 			assert.Equal(t, wGet.Header().Get("Location"), test.wantFullLink)
 
 			storage.AssertExpectations(t)
