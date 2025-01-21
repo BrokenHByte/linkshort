@@ -18,6 +18,7 @@ func RunServer(handlers *handlers.Handlers, config *config.ServerConfig) *Server
 	server := Server{handlers, config}
 	r := chi.NewRouter()
 	r.Post("/", logs.LoggingRequest(handlers.HandleCreateShortLink()))
+	r.Post("/api/shorten", logs.LoggingRequest(handlers.HandleShortenJSON()))
 	r.Get("/{shortLink}", logs.LoggingRequest(handlers.HandleGetFullLink()))
 
 	err := http.ListenAndServe(config.ServerAddr, r)

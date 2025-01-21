@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/BrokenHByte/linkshort/internal/config"
+	"github.com/BrokenHByte/linkshort/internal/logs"
 	"github.com/go-chi/chi"
 )
 
@@ -63,5 +65,54 @@ func (t *Handlers) HandleGetFullLink() http.HandlerFunc {
 		}
 		rw.Header().Set("Location", originalLink)
 		rw.WriteHeader(http.StatusTemporaryRedirect)
+	})
+}
+
+type RequestShortenJSON struct {
+	URL string `json:"url"`
+}
+
+type ResponseShortenJSON struct {
+	Result string `json:"result"`
+}
+
+func (t *Handlers) HandleShortenJSON() http.HandlerFunc {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/json" {
+			logs.Logs().Infoln("Content-Type not equal application/json")
+		}
+
+		jsonBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			logs.Logs().Infoln("Invalid json request body")
+			return
+		}
+
+		var requestJSONObject RequestShortenJSON
+		if err = json.Unmarshal(jsonBytes, &requestJSONObject); err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			logs.Logs().Infoln("Error unmarshal - ", jsonBytes)
+			return
+		}
+
+		shortLink, ok := t.storage.AddLink(requestJSONObject.URL)
+		if !ok {
+			http.Error(rw, "", http.StatusBadRequest)
+			logs.Logs().Infoln("Error AddLink - ", requestJSONObject.URL)
+			return
+		}
+
+		responseJSONObject := ResponseShortenJSON{t.config.BaseURL + "/" + shortLink}
+		responseJSONBytes, err := json.Marshal(responseJSONObject)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			logs.Logs().Infoln("Error marshal - ", responseJSONObject)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusCreated)
+		rw.Write(responseJSONBytes)
 	})
 }

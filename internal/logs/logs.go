@@ -32,7 +32,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 var sugar *zap.SugaredLogger = nil
 
-func logs() *zap.SugaredLogger {
+func Logs() *zap.SugaredLogger {
 	if sugar == nil {
 		logger, err := zap.NewDevelopment()
 		if err != nil {
@@ -62,7 +62,7 @@ func LoggingRequest(h http.Handler) http.HandlerFunc {
 
 		duration := time.Since(start)
 
-		logs().Infoln(
+		Logs().Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
 			"status", responseData.status,
