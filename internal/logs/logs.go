@@ -45,7 +45,7 @@ func Logs() *zap.SugaredLogger {
 	return sugar
 }
 
-func LoggingRequest(h http.Handler) http.HandlerFunc {
+func LoggingRequest(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 

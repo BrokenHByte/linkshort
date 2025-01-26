@@ -17,9 +17,12 @@ type Server struct {
 func RunServer(handlers *handlers.Handlers, config *config.ServerConfig) *Server {
 	server := Server{handlers, config}
 	r := chi.NewRouter()
-	r.Post("/", logs.LoggingRequest(handlers.HandleCreateShortLink()))
-	r.Post("/api/shorten", logs.LoggingRequest(handlers.HandleShortenJSON()))
-	r.Get("/{shortLink}", logs.LoggingRequest(handlers.HandleGetFullLink()))
+	r.Use(handlers.MiddlewareReadGzip)
+	r.Use(handlers.MiddlewareWriteGzip)
+	r.Use(logs.LoggingRequest)
+	r.Post("/", handlers.HandleCreateShortLink())
+	r.Post("/api/shorten", handlers.HandleShortenJSON())
+	r.Get("/{shortLink}", handlers.HandleGetFullLink())
 
 	err := http.ListenAndServe(config.ServerAddr, r)
 	if err != nil {

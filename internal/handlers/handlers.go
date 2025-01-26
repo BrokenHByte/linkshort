@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/BrokenHByte/linkshort/internal/config"
 	"github.com/BrokenHByte/linkshort/internal/logs"
@@ -114,5 +116,54 @@ func (t *Handlers) HandleShortenJSON() http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusCreated)
 		rw.Write(responseJSONBytes)
+	})
+}
+
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
+}
+
+func (t *Handlers) MiddlewareReadGzip(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// Распаковываем вывод если есть метка в header
+		if !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") || r.Header.Get("Content-Type") != "application/x-gzip" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		gz, err := gzip.NewReader(r.Body)
+		if err != nil {
+			logs.Logs().Error(err.Error())
+			return
+		}
+		defer gz.Close()
+
+		r.Body = gz
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (t *Handlers) MiddlewareWriteGzip(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// Сжимаем вывод только если есть поддержка у клиента, и на выход идёт текст или json
+		content := r.Header.Get("Content-Type")
+		if !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") ||
+			(content != "application/json" && content != "text/html") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
+		}
+		defer gz.Close()
+
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
 	})
 }
