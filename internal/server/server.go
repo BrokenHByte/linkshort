@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/BrokenHByte/linkshort/internal/config"
 	"github.com/BrokenHByte/linkshort/internal/handlers"
@@ -9,13 +10,7 @@ import (
 	"github.com/go-chi/chi"
 )
 
-type Server struct {
-	handlers *handlers.Handlers
-	config   *config.ServerConfig
-}
-
-func RunServer(handlers *handlers.Handlers, config *config.ServerConfig) *Server {
-	server := Server{handlers, config}
+func RunServer(wg *sync.WaitGroup, handlers *handlers.Handlers, config *config.ServerConfig) *http.Server {
 	r := chi.NewRouter()
 	r.Use(handlers.MiddlewareReadGzip)
 	r.Use(handlers.MiddlewareWriteGzip)
@@ -24,9 +19,13 @@ func RunServer(handlers *handlers.Handlers, config *config.ServerConfig) *Server
 	r.Post("/api/shorten", handlers.HandleShortenJSON())
 	r.Get("/{shortLink}", handlers.HandleGetFullLink())
 
-	err := http.ListenAndServe(config.ServerAddr, r)
-	if err != nil {
-		panic("The server address is inaccessible or not valid")
-	}
-	return &server
+	srv := &http.Server{Addr: config.ServerAddr, Handler: r}
+
+	go func() {
+		defer wg.Done()
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			logs.Logs().Fatalf("ListenAndServe(): %v", err)
+		}
+	}()
+	return srv
 }

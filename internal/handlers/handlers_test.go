@@ -33,6 +33,9 @@ func (t *MockStorage) GetLink(shortLink string) (string, bool) {
 	return args.String(0), true
 }
 
+func (t *MockStorage) Save(write io.Writer) {}
+func (t *MockStorage) Load(write io.Reader) {}
+
 func TestHandlersCreateAndGet(t *testing.T) {
 	tests := []struct {
 		name           string

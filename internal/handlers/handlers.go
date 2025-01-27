@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/BrokenHByte/linkshort/internal/config"
@@ -17,6 +18,8 @@ import (
 type ActionsStorage interface {
 	AddLink(originalLink string) (string, bool)
 	GetLink(shortLink string) (string, bool)
+	Load(dataReader io.Reader)
+	Save(dataWriter io.Writer)
 }
 
 type Handlers struct {
@@ -27,6 +30,32 @@ type Handlers struct {
 func NewHandlers(config *config.ServerConfig,
 	storage ActionsStorage) *Handlers {
 	return &Handlers{config, storage}
+}
+
+func (t *Handlers) LoadStorageFromFile(filename string) {
+	if filename == "" {
+		return
+	}
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0666)
+	if err != nil {
+		logs.Logs().Error(err)
+		return
+	}
+	t.storage.Load(file)
+	file.Close()
+}
+
+func (t *Handlers) SaveStorageFromFile(filename string) {
+	if filename == "" {
+		return
+	}
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		logs.Logs().Error(err)
+		return
+	}
+	t.storage.Save(file)
+	file.Close()
 }
 
 func (t *Handlers) HandleCreateShortLink() http.HandlerFunc {
